@@ -19,6 +19,43 @@ namespace PlugHub
 
         private GattCharacteristic powerStateCharacteristic = null;
 
+        public async Task Toggle()
+        {
+            await HandleToggle();
+        }
+
+        private async Task HandleToggle(int retryCount = 1) {
+            var characteristic = await GetPowerStateCharacteristic();
+            if (characteristic != null)
+            {
+                try
+                {
+                    Console.WriteLine("Reading current power state...");
+                    var bytes = await characteristic.ReadValueAsync(timeout);
+                    var poweredOn = false;
+                    if (bytes.Length == 1)
+                    {
+                        poweredOn = bytes[0] == 1;
+                        Console.WriteLine($"Powered on: {poweredOn}");
+                        Console.WriteLine("Toggling powered on state...");
+                        await characteristic.WriteValueAsync(new byte[] { (byte)(poweredOn ? 0 : 1) }, new Dictionary<string, object>());
+                    }
+                }
+                catch (Tmds.DBus.DBusException ex)
+                {
+                    Console.WriteLine($"D-Bus exception while attempting to toggle power state: {ex.Message}");
+                    if (retryCount > 3) {
+                        throw;
+                    } else {
+                        Console.WriteLine("Retrying...");
+                        powerStateCharacteristic = null;
+                        await HandleToggle(retryCount + 1);
+                    }
+                }
+                
+            }
+        }
+
         private async Task<GattCharacteristic> GetPowerStateCharacteristic()
         {
             if (powerStateCharacteristic == null)
@@ -45,8 +82,13 @@ namespace PlugHub
                         deviceAddress = await d.GetAddressAsync();
                         break;
                     } else {
-                        return null;
+                        continue;
                     }
+                }
+
+                if (deviceAddress == "") {
+                    Console.WriteLine("No matching devices found.");
+                    return null;
                 }
 
                 var device = await adapter.GetDeviceAsync(deviceAddress);
@@ -60,6 +102,8 @@ namespace PlugHub
                 await device.ConnectAsync();
                 await device.WaitForPropertyValueAsync("Connected", value: true, timeout);
                 Console.WriteLine("Connected.");
+
+                device.Disconnected += OnDisconnected;
 
                 Console.WriteLine("Waiting for services to resolve...");
                 await device.WaitForPropertyValueAsync("ServicesResolved", value: true, timeout);
@@ -84,22 +128,9 @@ namespace PlugHub
             }
         }
 
-        public async Task Toggle()
-        {
-            var characteristic = await GetPowerStateCharacteristic();
-            if (characteristic != null)
-            {
-                Console.WriteLine("Reading current power state...");
-                var bytes = await characteristic.ReadValueAsync(timeout);
-                var poweredOn = false;
-                if (bytes.Length == 1)
-                {
-                    poweredOn = bytes[0] == 1;
-                    Console.WriteLine($"Powered on: {poweredOn}");
-                    Console.WriteLine("Toggling powered on state...");
-                    await characteristic.WriteValueAsync(new byte[] { (byte)(poweredOn ? 0 : 1) }, new Dictionary<string, object>());
-                }
-            }
+        private async Task OnDisconnected(Device sender, BlueZEventArgs eventArgs) {
+            Console.WriteLine($"{await sender.GetNameAsync()} has disconnected. Will attempt reconnect on next attempt.");
+            powerStateCharacteristic = null;
         }
     }
 }
