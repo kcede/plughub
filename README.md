@@ -5,6 +5,17 @@ that can connect to and control a Hue Smart plug.
 
 The application is intended for use with a Raspberry Pi device using the BlueZ Bluetooth stack.
 
+## Motivation
+
+Using the native [Philips Hue Bluetooth app](https://www.philips-hue.com/en-us/explore-hue/apps/bluetooth)
+is okay, but it feels too slow. You need to open the app, wait for it to connect, and then toggle the light. 
+I would like to be able to press a button (preferably a physical one) and the light would turn on. 
+Having the lamp plugged in through the smart plug also means you can't really manipulate the light directly 
+if you still want the smart plug to do its thing.
+
+Having a Raspberry Pi always connected to the smart plug, and always ready to perform a command using 
+an API means I can toggle the light by pressing a button on my keyboard or use an NFC tag reader app.
+
 ## Vendor specific Bluetooth services
 
 The Hue Smart plug was inspected using [nRF Connect](https://play.google.com/store/apps/details?id=no.nordicsemi.android.mcp&hl=en).
